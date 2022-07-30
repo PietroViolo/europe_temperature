@@ -16,17 +16,39 @@ library(viridis)
 library(gganimate)
 
 # Central England temperature from the met office
-df <- read.table("https://www.metoffice.gov.uk/hadobs/hadcet/data/meantemp_monthly_totals.txt", skip = 4, header = T)
+df <- read.table("https://www.metoffice.gov.uk/hadobs/hadcet/data/meantemp_daily_totals.txt", header = T)
 
-df <- df %>% select(- Annual) %>% 
-  pivot_longer(Jan:Dec, values_to = "average_temp", names_to = "Month") %>% 
-  filter(Year >= 1950)
+df <- df %>% mutate(Date =as.Date(Date, format = c("%Y-%m-%d"))) %>%
+             mutate(Month = month(Date),
+                    Day = day(Date),
+                    Year = year(Date)) %>% 
+  filter(Year >= 1870)
 
-df <- df %>% 
-  filter(average_temp > -99.9) %>% mutate(Month = factor(Month, levels = c("Jan", "Feb", "Mar", 
-                                                                           "Apr", "May", "Jun",
-                                                                           "Jul", "Aug", "Sep",
-                                                                           "Oct", "Nov", "Dec"))) 
+# # Calculate difference from a 30 year average
+# # First, calculate a 30 year average
+# 
+# average30 <- c()
+# 
+# for(month in month.abb){
+#   for(n in 1:122){
+#     
+#     average30 <- rbind(average30, cbind(mean(unlist((df %>% filter(Month == month))[n:(30+n),3]), na.rm = TRUE), month, paste(1900 + n)))
+#   
+#     }
+# }
+
+# average30_df <- as.data.frame(average30) %>% 
+#   mutate(V1 = as.double(V1),
+#          V3 = as.integer(V3))
+# 
+# colnames(average30_df) <- c("average30", "Month", "Year")
+# 
+# 
+# df <- left_join(df, average30_df) %>% 
+#   mutate(anomalies = average_temp - average30) %>% 
+#   filter(Year >= 1900)
+# 
+
 
 # Close the gap
 
@@ -34,12 +56,13 @@ bridges <- df[df$Month == 'Jan',]
 bridges$Year <- bridges$Year - 1    # adjust index to align with previous group
 bridges$Month <- NA  
 
-df <- rbind(df, bridges) %>% 
-  arrange(Year, Month) %>% 
-  mutate(frame_n = 1:943)
+df <- rbind(df, bridges) %>% mutate(Month = factor(Month, levels = c("Jan", "Feb", "Mar", 
+                                                                     "Apr", "May", "Jun",
+                                                                     "Jul", "Aug", "Sep",
+                                                                     "Oct", "Nov", "Dec"))) 
 
-gg_df <- df %>% ggplot(aes(x = Month, y = average_temp, color = Year, group = Year)) +
-  geom_line(size = 1.5) +
+gg_df <- df %>% ggplot(aes(x = Month, y = anomalies, color = Year, group = Year)) +
+  geom_path(size = 1.5) +
   scale_color_viridis(option = "magma") +
   theme_dark() +
   coord_polar() + 
@@ -47,8 +70,9 @@ gg_df <- df %>% ggplot(aes(x = Month, y = average_temp, color = Year, group = Ye
 
 
 df_anim <- gg_df +
-  labs(title = 'Year: {Year}', x = 'Month', y = 'Average temperature')+
-  transition_reveal(frame_n) +
+  labs(title = 'Frame: {frame_time}', x = 'Month', y = 'Temperature anomalies')+
+  transition_time(Year) +
   shadow_mark(past = TRUE)
 
+  
 
